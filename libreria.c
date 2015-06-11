@@ -13,6 +13,13 @@
 #define NUM_MAX_DIRECTORIOS 10
 
 
+
+/*
+	Autor: Georvic Tur ---- Carnet: 12-11402
+	
+*/
+
+
 /*
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
@@ -38,12 +45,18 @@ void abrir_directorio(char *nombre_directorio, char *nombres_archivos[], int *nu
 	//Se recorre el directorio y se guardan los nombres de archivos
 	char *nombre_archivo;
 	*num_archivos = 0;
-	printf("TEST_abrir_directorio_path:%s\n",nombre_directorio);
 	entrada_directorio = readdir(directorio);
-	printf("TEST_abrir_directorio_FIN\n");
+	
 	while(entrada_directorio != NULL){
 		
+		//Solo tomo en cuenta a los archivos regulares
+		
 		if (strcmp(entrada_directorio->d_name,".") == 0){
+			entrada_directorio = readdir(directorio);
+			continue;
+		}
+		
+		if (entrada_directorio->d_type != DT_REG){
 			entrada_directorio = readdir(directorio);
 			continue;
 		}
@@ -54,7 +67,7 @@ void abrir_directorio(char *nombre_directorio, char *nombres_archivos[], int *nu
 		*num_archivos = *num_archivos + 1;
 		entrada_directorio = readdir(directorio);
 	}
-	printf("TEST_abrir_directorio_FIN\n");
+	
 	closedir(directorio);
 
 }
@@ -66,13 +79,12 @@ void abrir_archivo(char *nombre_archivo, char *texto_parcial){
 	Abre un archivo de nombre nombre_archivo y guarda e texto_parcial el texto 
 	que alli se encuentra.
 	
-	La memoria de texto parcial se solicita en esta funcion
+	La memoria de texto parcial se solicita fuera de esta funcion
 	*/
-	printf("--abrir_archivo: %s\n", nombre_archivo);
+	
 	int descriptor = open(nombre_archivo, O_RDONLY);
-	//texto_parcial = (char *)malloc(sizeof(char)*TAM_BUFFER_ARCHIVO);
 	read(descriptor, texto_parcial,TAM_BUFFER_ARCHIVO);
-	printf("abrir_archivo TEXTO_PARCIAL:  %s\n", texto_parcial);
+	
 	close(descriptor);
 
 }
@@ -107,7 +119,6 @@ void generar_secuencia_aleatorios(int secuencia_numeros_aleatorios[]
 	de los archivos del directorio. 
 	*/
 	
-	printf("Numero_archivos_seleccionados: %d\n", numero_archivos_seleccionados);
 	
 	//Introduzco la semilla
 	int semilla = 1;
@@ -122,8 +133,6 @@ void generar_secuencia_aleatorios(int secuencia_numeros_aleatorios[]
 	
 		numero_aleatorio = rand(); //Siguiente numero de la secuencia
 		numero_aleatorio = numero_aleatorio % tamano_de_secuencia + 1;
-		
-		printf("TEST_generar_secuencia_aleatorios\n");
 		
 		if (esta_en(numero_aleatorio, secuencia_numeros_aleatorios, i)){
 			continue;
@@ -156,14 +165,10 @@ void abrir_archivos(char *nombre_dir //Nombre del directorio
 	*/
 	
 	
-	printf("TEST_abrir_archivos_1\n");
-	
 	//Abro el directorio y leo los nombres de los archivos
 	char *nombres_archivos[20];
 	abrir_directorio(nombre_dir, nombres_archivos, num_archivos);
 	
-	
-	printf("TEST_abrir_archivos_2\n");
 	//Obtengo una secuencia de numeros aleatorios
 	int secuencia_numeros_aleatorios[20];
 	generar_secuencia_aleatorios(secuencia_numeros_aleatorios
@@ -195,15 +200,10 @@ void abrir_archivos(char *nombre_dir //Nombre del directorio
 		
 		sprintf(path_archivo, "%s/%s", nombre_dir, nombres_archivos[indice]);
 		
-		printf("nombre_dir: %s nombre_archivo: %s\n", nombre_dir, nombres_archivos[indice]);
-		printf("path_resultante: %s\n", path_archivo);
 		//Arbo el archivo
 		texto_parcial = (char *)malloc(sizeof(char)*TAM_BUFFER_ARCHIVO);
 		abrir_archivo(path_archivo, texto_parcial);
 		arreglo_textos_parciales[i] = texto_parcial;
-		
-		printf("abrir_archivos-- texto_parcial: %s\n", texto_parcial);
-		printf("abrir_archivos-- texto_parcial: %s\n", arreglo_textos_parciales[i]);
 		
 		free(path_archivo);
 		free(nombres_archivos[indice]);
@@ -221,18 +221,14 @@ void enviar_texto_a_padre(int mi_pipe[2], char **arreglo_textos_parciales, int t
 	Le envia los textos del arreglo al proceso padre a traves del pipe
 	*/
 	
-	printf("TAM_ARREGLO: %d\n", tam_arreglo);
 	int i;
 	for(i = 0; i < tam_arreglo; i++){
 	
-		printf("TEST_enviar_texto_a_padre: %s\n", arreglo_textos_parciales[i]);
 		write(mi_pipe[1], arreglo_textos_parciales[i]
 						, TAM_BUFFER_ARCHIVO);
-		printf("yaaaaaaaaaaaa--s %d\n",i);
 	
 	}
 	
-	printf("FINFIFNIFN\n");
 
 }
 
@@ -249,11 +245,9 @@ void leer_texto_de_hijos(int mi_pipe[2]
 	int i;
 	for(i = 0; i < tam_arreglo; i++){
 	
-		printf("LLEGAMOS\n");
 		if (read(mi_pipe[0], texto_parcial[i], TAM_BUFFER_ARCHIVO) <= 0){
 			break;
 		}
-		printf("TEST_leer_texto_de_hijos texto: %s\n", texto_parcial[i]);
 	
 	}
 	
@@ -264,35 +258,6 @@ void leer_texto_de_hijos(int mi_pipe[2]
 	
 }
 
-/*
-void guardar_texto_final_en_archivo(char *nombre_archivo_salida
-									, char *arreglo_textos_parciales_de_cada_hijo[20][250]
-									, int numero_directorios){
-	
-	
-
-	
-	
-	int descriptor_archivo = open(nombre_archivo_salida, O_WRONLY | O_CREAT | O_APPEND, 0640);
-	
-	int i;
-	int j;
-	for(i = 0; i < numero_directorios; i++){
-	
-		for(j = 0; j < 20; j++){
-		
-			write(descriptor_archivo
-					,arreglo_textos_parciales_de_cada_hijo[i][j]
-					, strlen(arreglo_textos_parciales_de_cada_hijo[i][j]));
-			
-		}
-	
-	}
-	
-	close(descriptor_archivo);
-
-}
-*/
 
 /*
 --------------------------------------------------------------------------------
@@ -384,8 +349,6 @@ int main(int argc, char *argv[]){
 	int arreglo_directorios[10];
 	generar_secuencia_aleatorios(arreglo_directorios, numero_directorios, NUM_MAX_DIRECTORIOS);
 	
-	printf("arreglo_directorios[1]:%d\n", arreglo_directorios[1]);
-	
 	
 	//Path de cada hijo
 	char *path_directorio_hijo = (char *)malloc(sizeof(char)*100);
@@ -422,9 +385,6 @@ int main(int argc, char *argv[]){
 			//Se abren los archivos del directorio correspondiente y se crea
 			// el texto parcial
 			
-			printf("TEST_1_path: %s\n", path_directorio_hijo);
-			
-			
 			int numero_archivos_encontrados;
 			char **arreglo_textos_parciales;
 			//Solicito memoria para el arreglo de textos parciales
@@ -437,18 +397,11 @@ int main(int argc, char *argv[]){
 			
 			
 			//Le comunico al padre el texto parcial del hijo usando pipes
-			printf("TEXTO_PARCIAL:  %s\n", arreglo_textos_parciales[i]);
-			/*
-			enviar_texto_a_padre(arreglo_pipes[i]
-								, arreglo_textos_parciales
-								, numero_archivos_encontrados);
-			*/
 			
 			enviar_texto_a_padre(arreglo_pipes[i]
 								, arreglo_textos_parciales
 								, numero_archivos);
 			
-			printf("DESPUES_enviar_texto_a_padre\n");
 			close(arreglo_pipes[i][0]);
 			close(arreglo_pipes[i][1]);
 			
@@ -466,12 +419,10 @@ int main(int argc, char *argv[]){
 				free(arreglo_textos_parciales[m]);
 			}
 			
-			printf("NO_LLEGA_AQUI_HIJO\n");
 			
 			free(arreglo_textos_parciales);
 			
 			//El proceso hijo termina
-			printf("Proceso %d termino\n", i);
 			exit(0);
 			
 			
@@ -486,9 +437,7 @@ int main(int argc, char *argv[]){
 	
 	
 	//CODIGO DEL PROCESO PADRE
-	
-	
-	printf("TEST_2\n");
+
 	
 	//Espero que todos los hijos terminen
 	while(wait(NULL) > 0);
@@ -500,20 +449,12 @@ int main(int argc, char *argv[]){
 	
 	for(i = 0; i < numero_directorios; i++){
 	
-		printf("TEST_MAIN_LEER_1\n");
-		/*
-		leer_texto_de_hijos(arreglo_pipes[i]
-							, arreglo_textos_parciales_de_cada_hijo[i]
-							, 20);
-		*/
 		leer_texto_de_hijos(arreglo_pipes[i]
 							, arreglo_textos_parciales_de_cada_hijo[i]
 							, numero_archivos);
 		
-		printf("TEST_MAIN_LEER_2\n");
 		close(arreglo_pipes[i][0]);
 		close(arreglo_pipes[i][1]);
-		printf("TEST_MAIN_LEER_3\n");
 		
 	}
 	
@@ -521,11 +462,6 @@ int main(int argc, char *argv[]){
 	
 	
 	//Debo guardar los textos en un archivo de salida
-	/*
-	guardar_texto_final_en_archivo(nombre_archivo_salida
-									, arreglo_textos_parciales_de_cada_hijo
-									, numero_directorios);
-	*/
 	
 	int descriptor_archivo = open(nombre_archivo_salida, O_WRONLY | O_CREAT | O_APPEND, 0640);
 	
