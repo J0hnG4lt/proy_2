@@ -8,7 +8,7 @@
 #include <string.h>
 #include <sys/wait.h>
 
-#define TAM_BUFFER_ARCHIVO 500
+#define TAM_BUFFER_ARCHIVO 2000
 #define NUM_MAX_ARCHIVOS 20
 #define NUM_MAX_DIRECTORIOS 10
 
@@ -17,6 +17,7 @@
 /*
 	Autor: Georvic Tur ---- Carnet: 12-11402
 	
+	NOTA: EL PRGRAMA PRINCIPAL ESTA EN LA LINEA 333
 */
 
 
@@ -29,6 +30,46 @@
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 */
+
+void encontrar_directorios_presentes(char *directorios_presentes[], char *nombre_directorio_trabajo, int *numero_directorios_encontrados){
+	
+	/*
+	Lee el directorio de trabajo y guarda los nombres de los directorios que 
+	serán procesados por un único proceso. Los nombres se guardan en
+	directorios_presentes y la cantidad en numero_directorios_encontrados
+	*/
+	
+	//Abro el directorio de trabajo
+	DIR *directorio = opendir(nombre_directorio_trabajo);
+	struct dirent *entrada_directorio;
+	entrada_directorio = readdir(directorio);
+	int i=0;
+	
+	//Guardo los nombres de los directorios presentes
+	while(entrada_directorio != NULL){
+		
+		if ((entrada_directorio->d_type == DT_DIR) 
+				&& (strcmp(entrada_directorio->d_name, ".") != 0)
+				&& (strcmp(entrada_directorio->d_name, "..") != 0)
+			)
+			{
+			
+			directorios_presentes[i] = (char *)malloc(sizeof(char)*100);
+			strcpy(directorios_presentes[i],entrada_directorio->d_name);
+			
+			
+			
+			i++;
+			
+		}
+		entrada_directorio = readdir(directorio);
+	}
+	
+	*numero_directorios_encontrados = i;
+	
+	
+}
+
 
 void abrir_directorio(char *nombre_directorio, char *nombres_archivos[], int *num_archivos){
 
@@ -51,7 +92,8 @@ void abrir_directorio(char *nombre_directorio, char *nombres_archivos[], int *nu
 		
 		//Solo tomo en cuenta a los archivos regulares
 		
-		if (strcmp(entrada_directorio->d_name,".") == 0){
+		if ((strcmp(entrada_directorio->d_name,".") == 0)
+				|| (strcmp(entrada_directorio->d_name, "..") == 0)){
 			entrada_directorio = readdir(directorio);
 			continue;
 		}
@@ -274,7 +316,6 @@ void leer_texto_de_hijos(int mi_pipe[2]
 		if (read(mi_pipe[0], texto_parcial[i], TAM_BUFFER_ARCHIVO) <= 0){
 			break;
 		}
-	
 	}
 	
 	for(i=tam_arreglo;i < 20; i++){
@@ -303,6 +344,9 @@ int main(int argc, char *argv[]){
 								//de los directorios
 	char *nombre_archivo_salida = (char *)malloc(sizeof(char)*100);
 	
+	//Guarda los directorios presentes en el area de trabajo
+	char *directorios_presentes[10];
+	int numero_directorios_encontrados;
 	
 	
 	//Examino los argumentos del ejecutable
@@ -314,6 +358,10 @@ int main(int argc, char *argv[]){
 		numero_directorios = atoi(argv[3]);
 		numero_archivos = atoi(argv[4]);
 		strcpy(nombre_archivo_salida, argv[5]);
+		strcat(directorio_de_trabajo, "/");
+		
+		//Obtengo los nombres de los directorios presentes
+		encontrar_directorios_presentes(directorios_presentes, directorio_de_trabajo, &numero_directorios_encontrados);
 		
 	}
 	else{
@@ -321,15 +369,17 @@ int main(int argc, char *argv[]){
 		//Si no se especifica un directorio de trabajo
 		directorio_de_trabajo = (char *)malloc(sizeof(char)*100);
 		strcpy(directorio_de_trabajo, "");
-		numero_directorios = atoi(argv[2]);
-		numero_archivos = atoi(argv[3]);
-		strcpy(nombre_archivo_salida, argv[4]);
+		numero_directorios = atoi(argv[1]);
+		numero_archivos = atoi(argv[2]);
+		strcpy(nombre_archivo_salida, argv[3]);
 		
+		//Obtengo los nombres de los directorios presentes
+		encontrar_directorios_presentes(directorios_presentes, ".", &numero_directorios_encontrados);
 	
 	
 	}
 	
-	strcat(directorio_de_trabajo, "/");
+	
 	
 	
 	
@@ -369,11 +419,23 @@ int main(int argc, char *argv[]){
 	}
 	
 	
+	//Si el numero de directorios seleccionados es mayor al numero de
+	// directorios presentes
+	if (numero_directorios_encontrados < numero_directorios){
+	
+		printf("\n>> Sólo se encontraron %d directorios en lugar de %d.\n"
+				, numero_directorios_encontrados
+				, numero_directorios);
+		printf(">> Por esta razón, no se crearán todos los procesos.\n");
+		numero_directorios = numero_directorios_encontrados;
+		
+	}
+	
 	
 	
 	//Genero una secuencia de numeros unicos que representan a directorios
 	int arreglo_directorios[10];
-	generar_secuencia_aleatorios(arreglo_directorios, numero_directorios, NUM_MAX_DIRECTORIOS);
+	generar_secuencia_aleatorios(arreglo_directorios, numero_directorios, numero_directorios);
 	
 	
 	//Path de cada hijo
@@ -390,7 +452,7 @@ int main(int argc, char *argv[]){
 	
 	
 	//Entero a ASCII
-	char *itoa[10] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"};
+	//char *itoa[10] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"};
 	
 	//Creo un abanico de procesos
 	int procesos_hijos_pid[numero_directorios];
@@ -406,8 +468,8 @@ int main(int argc, char *argv[]){
 			
 			//Genero el path del directorio del hijo actual
 			strcpy(path_directorio_hijo, directorio_de_trabajo);
-			strcat(path_directorio_hijo, itoa[arreglo_directorios[i]]);
-			
+			strcat(path_directorio_hijo, directorios_presentes[arreglo_directorios[i]]);
+
 			//Se abren los archivos del directorio correspondiente y se crea
 			// el texto parcial
 			
@@ -417,7 +479,7 @@ int main(int argc, char *argv[]){
 			//arreglo_textos_parciales = (char **)malloc(sizeof(char *)*numero_archivos);
 			
 			char *arreglo_textos_parciales[numero_archivos];
-	
+			
 			abrir_archivos(path_directorio_hijo
 							, &numero_archivos_encontrados
 							, numero_archivos
@@ -429,6 +491,10 @@ int main(int argc, char *argv[]){
 			if (numero_archivos_encontrados < numero_archivos){
 				max_iter = numero_archivos_encontrados;
 				exit_status = max_iter;
+				
+				printf("\n>> El proceso %d sólo encontró %d archivos\n"
+						, getpid()
+						, numero_archivos_encontrados);
 			}
 			else{
 				max_iter = numero_archivos;
@@ -475,17 +541,15 @@ int main(int argc, char *argv[]){
 	//CODIGO DEL PROCESO PADRE
 
 	
-	//Espero que todos los hijos terminen
+	//Espero a que todos los hijos terminen
 	
-	
-	//while(wait(NULL) > 0);
-	
+	//Recibo los datos de los hijos que enviaron info a traves de exit
 	int exit_status[numero_directorios];
 	int numero_procesos_terminados = 0;
-	pid_t pid[numero_directorios];
+	//pid_t pid[numero_directorios];
 	
 	while(numero_procesos_terminados < numero_directorios){
-		pid[numero_procesos_terminados] = wait(&exit_status[numero_procesos_terminados]);
+		wait(&exit_status[numero_procesos_terminados]);
 		numero_procesos_terminados++;
 		
 	}
@@ -536,7 +600,7 @@ int main(int argc, char *argv[]){
 	free(nombre_archivo_salida);
 	free(path_directorio_hijo);
 	
-	
+	printf("\n>> Se terminó con éxito el programa\n");
 
 	return 0;
 }
